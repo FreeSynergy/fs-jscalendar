@@ -7,6 +7,10 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use super::zone::Zone;
 use crate::error::{Error, Result};
 
+/// Longest duration accepted, about 10 000 years. Anything longer is a mistake or an attack, and date
+/// arithmetic on it would leave the range of the time library.
+const MAX_DAYS: i64 = 3_650_000;
+
 /// A JSCalendar duration split into nominal days (weeks included) and exact seconds.
 /// `P1D` is a calendar day (23/25 hours across DST), `PT1H` is exactly 3600 s.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -38,11 +42,8 @@ impl Dur {
                     let n: i64 = num.parse().map_err(|_| bad())?;
                     num.clear();
                     let v = n.checked_mul(mult).ok_or_else(bad)?;
-                    if nominal {
-                        d.days += v;
-                    } else {
-                        d.secs += v;
-                    }
+                    let total = if nominal { &mut d.days } else { &mut d.secs };
+                    *total = total.checked_add(v).ok_or_else(bad)?;
                     any = true;
                 }
             }
@@ -55,7 +56,10 @@ impl Dur {
             }
             take(t, &[('H', 3600, false), ('M', 60, false), ('S', 1, false)])?;
         }
-        if any { Ok(d) } else { Err(bad()) }
+        if !any || d.days > MAX_DAYS || d.secs > MAX_DAYS * 86_400 {
+            return Err(bad());
+        }
+        Ok(d)
     }
 
     /// End of `start` (local, in `zone`) after this duration, as UTC.
