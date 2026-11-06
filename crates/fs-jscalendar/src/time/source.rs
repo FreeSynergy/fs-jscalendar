@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use jiff::tz::TimeZone;
 
 use super::zone::{IanaZone, Zone};
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, quoted};
 
 /// Where the active tz database comes from.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,12 +43,13 @@ pub trait ZoneSource: Send + Sync {
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+'));
         if !ok {
             return Err(Error::Time(format!(
-                "not a valid IANA time zone id {name:?}"
+                "not a valid IANA time zone id {}",
+                quoted(name)
             )));
         }
         let tz = self
             .lookup(name)
-            .ok_or_else(|| Error::Time(format!("unknown IANA time zone {name:?}")))?;
+            .ok_or_else(|| Error::Time(format!("unknown IANA time zone {}", quoted(name))))?;
         Ok(Zone::Iana(Box::new(IanaZone::new(name, tz))))
     }
 }

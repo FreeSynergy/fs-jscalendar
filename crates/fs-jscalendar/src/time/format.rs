@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, quoted};
 
 /// Format of UTC index values: lexicographic order == time order.
 pub const UTC_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
@@ -18,7 +18,8 @@ pub fn fmt_utc(t: DateTime<Utc>) -> String {
 }
 
 /// Exactly `YYYY-MM-DDTHH:MM:SS`. The time library alone also takes `+262142-1-1T00:00:0`, whose year
-/// would leave the range of every later calculation.
+/// would leave the range of every later calculation, and a second 60 in any minute. No JSCalendar value
+/// needs a leap second, and one that names it would sort behind [`FOREVER`].
 fn is_plain(s: &str) -> bool {
     s.len() == 19
         && s.bytes().enumerate().all(|(i, b)| match i {
@@ -27,15 +28,16 @@ fn is_plain(s: &str) -> bool {
             13 | 16 => b == b':',
             _ => b.is_ascii_digit(),
         })
+        && !s.ends_with(":60")
 }
 
 /// JSCalendar `LocalDateTime` (`2026-11-24T10:00:00`, no zone, no fraction in 2.0).
 pub fn parse_local(s: &str) -> Result<NaiveDateTime> {
     if !is_plain(s) {
-        return Err(Error::Time(format!("not a LocalDateTime: {s:?}")));
+        return Err(Error::Time(format!("not a LocalDateTime: {}", quoted(s))));
     }
     NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
-        .map_err(|_| Error::Time(format!("not a LocalDateTime: {s:?}")))
+        .map_err(|_| Error::Time(format!("not a LocalDateTime: {}", quoted(s))))
 }
 
 /// Format as JSCalendar `LocalDateTime`.
@@ -49,5 +51,5 @@ pub fn parse_utc(s: &str) -> Result<DateTime<Utc>> {
         .filter(|x| is_plain(x))
         .and_then(|x| NaiveDateTime::parse_from_str(x, "%Y-%m-%dT%H:%M:%S").ok())
         .map(|n| n.and_utc())
-        .ok_or_else(|| Error::Time(format!("not a UTCDateTime: {s:?}")))
+        .ok_or_else(|| Error::Time(format!("not a UTCDateTime: {}", quoted(s))))
 }

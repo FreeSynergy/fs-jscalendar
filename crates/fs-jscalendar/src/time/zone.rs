@@ -8,7 +8,7 @@ use jiff::tz::TimeZone;
 
 use super::select::ACTIVE;
 use super::source::ZoneSource;
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, quoted};
 
 /// An IANA zone resolved against a tz database.
 #[derive(Clone, Debug)]
@@ -47,7 +47,8 @@ impl Zone {
     pub fn parse_in(source: &dyn ZoneSource, name: &str) -> Result<Zone> {
         if name.starts_with('/') {
             return Err(Error::Time(format!(
-                "custom time zone {name:?} is not allowed in JSCalendar 2.0"
+                "custom time zone {} is not allowed in JSCalendar 2.0",
+                quoted(name)
             )));
         }
         source.zone(name)
@@ -58,7 +59,8 @@ impl Zone {
     pub fn parse(name: &str) -> Result<Zone> {
         if name.starts_with('/') {
             return Err(Error::Time(format!(
-                "custom time zone {name:?} is not allowed in JSCalendar 2.0"
+                "custom time zone {} is not allowed in JSCalendar 2.0",
+                quoted(name)
             )));
         }
         ACTIVE.zone(name)

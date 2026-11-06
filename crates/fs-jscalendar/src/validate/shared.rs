@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use super::ctx::Ctx;
 use super::rule::rule;
+use crate::error::{quoted, short};
 use crate::model::{PARTICIPATION_STATUSES, RecurrenceRule, VERSION};
 use crate::time::{Zone, parse_local, parse_utc};
 
@@ -34,14 +35,20 @@ pub fn shared<T: serde::Serialize>(c: &mut Ctx, obj: &T) {
         if parse_local(st).is_err() {
             c.bad(
                 "/start",
-                format!("not a LocalDateTime (no zone suffix, no fraction in 2.0): {st:?}"),
+                format!(
+                    "not a LocalDateTime (no zone suffix, no fraction in 2.0): {}",
+                    quoted(st)
+                ),
             );
         }
     }
     for k in ["created", "updated"] {
         if let Some(t) = s(k) {
             if parse_utc(t).is_err() {
-                c.bad(&format!("/{k}"), format!("not a UTCDateTime: {t:?}"));
+                c.bad(
+                    &format!("/{k}"),
+                    format!("not a UTCDateTime: {}", quoted(t)),
+                );
             }
         }
     }
@@ -50,7 +57,10 @@ pub fn shared<T: serde::Serialize>(c: &mut Ctx, obj: &T) {
             if Zone::parse(z).is_err() {
                 c.bad(
                     &format!("/{k}"),
-                    format!("not an IANA time zone (JSCalendar 2.0 has no custom zones): {z:?}"),
+                    format!(
+                        "not an IANA time zone (JSCalendar 2.0 has no custom zones): {}",
+                        quoted(z)
+                    ),
                 );
             }
         }
@@ -82,7 +92,7 @@ pub fn shared<T: serde::Serialize>(c: &mut Ctx, obj: &T) {
         for k in ov.keys() {
             if parse_local(k).is_err() {
                 c.bad(
-                    &format!("/recurrenceOverrides/{k}"),
+                    &format!("/recurrenceOverrides/{}", short(k)),
                     "key must be a LocalDateTime",
                 );
             }
@@ -93,14 +103,17 @@ pub fn shared<T: serde::Serialize>(c: &mut Ctx, obj: &T) {
             if let Some(st) = p.get("participationStatus").and_then(Value::as_str) {
                 if !PARTICIPATION_STATUSES.contains(&st) {
                     c.bad(
-                        &format!("/participants/{k}/participationStatus"),
-                        format!("{st:?} not in {PARTICIPATION_STATUSES:?}"),
+                        &format!("/participants/{}/participationStatus", short(k)),
+                        format!("{} not in {PARTICIPATION_STATUSES:?}", quoted(st)),
                     );
                 }
             }
             for obsolete in ["language", "locationId"] {
                 if p.get(obsolete).is_some() {
-                    c.bad(&format!("/participants/{k}/{obsolete}"), "obsolete in 2.0");
+                    c.bad(
+                        &format!("/participants/{}/{obsolete}", short(k)),
+                        "obsolete in 2.0",
+                    );
                 }
             }
         }

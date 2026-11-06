@@ -9,17 +9,18 @@ task status (`fs-tasks`). A type moves here only when both owners really use it.
 
 ## State
 
-Version 0.1.0. Taken from `fs-tasks-core` and `fs-calendar-core`, which held identical copies.
+Version 0.1.3. Taken from `fs-tasks-core` and `fs-calendar-core`, which held identical copies.
 
 | Area | State |
 |---|---|
 | `time`: `Zone`, `ZoneSource` (system / bundled tzdb, newest wins), `Dur`, `LocalDateTime` / `UTCDateTime` | done |
 | `model`: `Participant`, `RecurrenceRule`, `NDay`, aliases, constants, `next_participant_key` | done |
 | `calendar_object!` / `typed_object!`: members and common methods of an object, lossless `extra` | done |
-| `upgrade`: RFC 8984 to 2.0, idempotent, nothing dropped | done |
+| `upgrade`: RFC 8984 to 2.0, idempotent, nothing dropped; fractions leave every date-time and duration of the object, durations round up; values in alerts and participants stay as they are | done |
 | `validate`: `Ctx`, `common`, `shared`, recurrence rule; owners add their own rules | done |
-| `ical`: `split_ics(text, Component)`, `parse_entries`, `write_ics` through `calcard =0.3.14` | done |
-| Tests | 6 here; the behaviour is also covered by the tests of both owners |
+| `ical`: `split_ics(text, Component)`, `unfolded_lines`, `parse_entries`, `write_ics` through `calcard =0.3.14`; components are found on unfolded lines, so a continuation line never ends one | done |
+| Date-times: exactly `YYYY-MM-DDTHH:MM:SS`, second 60 refused; messages quote a value short and escaped (`quoted`) | done |
+| Tests | 17 here; the behaviour is also covered by the tests of both owners |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -34,6 +35,7 @@ Version 0.1.0. Taken from `fs-tasks-core` and `fs-calendar-core`, which held ide
 | `upgrade.rs` | Pipeline | small rewrite steps, idempotent, with notes |
 | `ical/convert.rs` | Adapter | wraps `calcard`; passes JSON values, owners make them typed |
 | `ical/split.rs` | Iterator-style scan | exact source text per UID, so the original stays byte for byte (ADR 0030) |
+| `upgrade_times.rs` | Pipeline step | whole seconds for `upgrade`, every original kept |
 | `error.rs`, `clock.rs`, `uid.rs` | none | plain error enum and pure helpers |
 
 ## Decisions

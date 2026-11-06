@@ -7,4 +7,4 @@ mod convert;
 mod split;
 
 pub use convert::{ICS_MEDIA_TYPE, parse_entries, write_ics};
-pub use split::{Component, IcsPart, split_ics};
+pub use split::{Component, IcsPart, split_ics, unfolded_lines};

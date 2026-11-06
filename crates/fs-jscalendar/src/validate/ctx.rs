@@ -3,7 +3,7 @@
 //! Pattern: Collecting parameter — every rule reports into one `Ctx`, so an object is checked
 //! completely and the caller sees all problems at once.
 
-use crate::error::{Error, Issue, Result};
+use crate::error::{Error, Issue, Result, quoted};
 
 pub(super) const FREQ: [&str; 7] = [
     "yearly", "monthly", "weekly", "daily", "hourly", "minutely", "secondly",
@@ -32,7 +32,7 @@ impl Ctx {
     pub fn one_of(&mut self, path: &str, v: Option<&str>, allowed: &[&str]) {
         if let Some(s) = v {
             if !allowed.contains(&s) {
-                self.bad(path, format!("{s:?} not in {allowed:?}"));
+                self.bad(path, format!("{} not in {allowed:?}", quoted(s)));
             }
         }
     }

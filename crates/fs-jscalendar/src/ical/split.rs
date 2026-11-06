@@ -41,35 +41,62 @@ pub struct IcsPart {
     pub text: String,
 }
 
+/// One content line, unfolded (RFC 5545 3.1), and the physical lines it was written on.
+struct Logical {
+    first: usize,
+    last: usize,
+    text: String,
+}
+
+/// A line that begins with a space or tab continues the one before, whatever it says.
+fn is_continuation(line: &str) -> bool {
+    line.starts_with([' ', '\t'])
+}
+
+fn logical_lines(lines: &[&str]) -> Vec<Logical> {
+    let mut out: Vec<Logical> = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        match out.last_mut().filter(|_| is_continuation(line)) {
+            Some(open) => {
+                open.last = i;
+                open.text.push_str(line[1..].trim_end_matches(['\r', '\n']));
+            }
+            None => out.push(Logical {
+                first: i,
+                last: i,
+                text: line.trim_end_matches(['\r', '\n']).to_string(),
+            }),
+        }
+    }
+    for line in &mut out {
+        line.text.truncate(line.text.trim_end().len());
+    }
+    out
+}
+
+/// The content lines of an iCalendar text, unfolded. What looks like a property or a component on a
+/// continuation line is part of the line before it.
+pub fn unfolded_lines(text: &str) -> Vec<String> {
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    logical_lines(&lines).into_iter().map(|l| l.text).collect()
+}
+
 fn block_name(line: &str) -> Option<String> {
-    let t = line.trim();
-    let name = t
+    let name = line
         .get(..6)
         .filter(|b| b.eq_ignore_ascii_case("BEGIN:"))
-        .map(|_| &t[6..])?;
+        .map(|_| &line[6..])?;
     (!name.is_empty()).then(|| name.to_ascii_uppercase())
 }
 
-fn uid_of(block: &[&str]) -> Option<String> {
-    let mut found: Option<String> = None;
-    for (i, l) in block.iter().enumerate() {
-        let up = l.get(..4).map(str::to_ascii_uppercase);
-        if matches!(up.as_deref(), Some("UID:" | "UID;")) {
-            let mut v = l[l.find(':')? + 1..]
-                .trim_end_matches(['\r', '\n'])
-                .to_string();
-            for cont in &block[i + 1..] {
-                if cont.starts_with(' ') || cont.starts_with('\t') {
-                    v.push_str(cont[1..].trim_end_matches(['\r', '\n']));
-                } else {
-                    break;
-                }
-            }
-            found = Some(v);
-            break;
-        }
-    }
-    found
+fn uid_of(block: &[Logical]) -> Option<String> {
+    let line = block.iter().find(|l| {
+        l.text
+            .get(..4)
+            .is_some_and(|n| n.eq_ignore_ascii_case("UID:") || n.eq_ignore_ascii_case("UID;"))
+    })?;
+    let colon = line.text.find(':')?;
+    Some(line.text[colon + 1..].to_string())
 }
 
 /// Split an `.ics` text into per-UID parts of the components `own` names.
@@ -78,28 +105,29 @@ pub fn split_ics(text: &str, own: Component) -> Vec<IcsPart> {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let (mut head, mut tz): (Vec<&str>, Vec<&str>) = (vec![], vec![]);
     let mut comps: Vec<(String, Vec<&str>)> = vec![]; // (uid, lines) in order
+    let logical = logical_lines(&lines);
     let mut i = 0;
     let mut seen_component = false;
     let mut foreign = false; // the other kind has its own owner; its text is not part of our original
-    while i < lines.len() {
-        let l = lines[i];
-        match block_name(l).as_deref() {
+    while i < logical.len() {
+        let line = &logical[i];
+        match block_name(&line.text).as_deref() {
             Some("VCALENDAR") | None => {
-                let t = l.trim();
-                if !t.eq_ignore_ascii_case("END:VCALENDAR") && !seen_component {
-                    head.push(l);
+                if !line.text.eq_ignore_ascii_case("END:VCALENDAR") && !seen_component {
+                    head.extend_from_slice(&lines[line.first..=line.last]);
                 }
                 i += 1;
             }
             Some(name) => {
-                let end = (i + 1..lines.len())
-                    .find(|&j| lines[j].trim().eq_ignore_ascii_case(&format!("END:{name}")))
-                    .unwrap_or(lines.len() - 1);
-                let block = &lines[i..=end];
+                let close = format!("END:{name}");
+                let end = (i + 1..logical.len())
+                    .find(|&j| logical[j].text.eq_ignore_ascii_case(&close))
+                    .unwrap_or(logical.len() - 1);
+                let block = &lines[line.first..=logical[end].last];
                 if name == "VTIMEZONE" {
                     tz.extend_from_slice(block);
                 } else if name == own.name() {
-                    if let Some(uid) = uid_of(block) {
+                    if let Some(uid) = uid_of(&logical[i..=end]) {
                         comps.push((uid, block.to_vec()));
                     }
                 } else if name == own.other() {

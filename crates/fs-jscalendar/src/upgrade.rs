@@ -8,6 +8,9 @@
 //! * Properties that 2.0 made obsolete are moved into `freesynergy.net:legacy` instead of being dropped:
 //!   `timeZones`, `excludedRecurrenceRules`, `Link.cid`, `Location.timeZone` / `relativeTo`,
 //!   `Participant.language` / `locationId`, fractional seconds, custom time zone ids.
+//! * Fractional seconds leave every date-time and duration of the object (`upgrade_times`), so the
+//!   upgraded data validates. Values inside sub-objects (alerts, participants) are not touched: 2.0 does
+//!   not validate them here.
 //! * A trailing `Z` on `start` / `due` becomes `timeZone: "Etc/UTC"` (2.0 local date-times have no zone suffix).
 //! * `version: "2.0"` is set. Groups are upgraded entry by entry. Already-2.0 data passes through unchanged
 //!   (idempotent).
@@ -18,6 +21,7 @@
 use serde_json::{Map, Value, json};
 
 use crate::model::{LEGACY_KEY, VERSION};
+use crate::upgrade_times::{round_times, whole_seconds};
 
 /// Result of an upgrade.
 #[derive(Clone, Debug, PartialEq)]
@@ -85,31 +89,8 @@ fn up(mut v: Value, notes: &mut Vec<String>, at: &str) -> Value {
             legacy.insert(key.into(), x);
         }
     }
-    // zone suffix on local date-times
-    for key in ["start", "due"] {
-        if let Some(s) = o.get(key).and_then(Value::as_str).map(str::to_string) {
-            if let Some(local) = s.strip_suffix('Z') {
-                if !o.contains_key("timeZone") {
-                    o.insert("timeZone".into(), json!("Etc/UTC"));
-                }
-                o.insert(key.into(), json!(strip_fraction(local)));
-                notes.push(format!(
-                    "{at}: `{key}` had a Z suffix; now local time in Etc/UTC"
-                ));
-            } else if s.contains('.') {
-                legacy.insert(format!("{key}Original"), json!(s));
-                o.insert(key.into(), json!(strip_fraction(&s)));
-                notes.push(format!("{at}: fractional seconds removed from `{key}`"));
-            }
-        }
-    }
-    if let Some(Value::Object(ov)) = o.get_mut("recurrenceOverrides") {
-        let old = std::mem::take(ov);
-        for (k, val) in old {
-            let k2 = strip_fraction(k.strip_suffix('Z').unwrap_or(&k));
-            ov.insert(k2, val);
-        }
-    }
+    local_times(o, &mut legacy, notes, at);
+    round_times(o, &mut legacy, notes, at);
     // obsolete members of sub-objects
     move_sub(
         o,
@@ -139,11 +120,53 @@ fn up(mut v: Value, notes: &mut Vec<String>, at: &str) -> Value {
     v
 }
 
-fn strip_fraction(s: &str) -> String {
-    match s.split_once('.') {
-        Some((a, _)) => a.to_string(),
-        None => s.to_string(),
+/// A zone suffix or a fraction on `start` and `due`, and on the keys of the overrides.
+fn local_times(
+    o: &mut Map<String, Value>,
+    legacy: &mut Map<String, Value>,
+    notes: &mut Vec<String>,
+    at: &str,
+) {
+    // zone suffix on local date-times
+    for key in ["start", "due"] {
+        if let Some(s) = o.get(key).and_then(Value::as_str).map(str::to_string) {
+            if let Some(local) = s.strip_suffix('Z') {
+                if !o.contains_key("timeZone") {
+                    o.insert("timeZone".into(), json!("Etc/UTC"));
+                }
+                if s.contains('.') {
+                    legacy.insert(format!("{key}Original"), json!(s));
+                }
+                o.insert(key.into(), json!(strip_fraction(local)));
+                notes.push(format!(
+                    "{at}: `{key}` had a Z suffix; now local time in Etc/UTC"
+                ));
+            } else if whole_seconds(&s).is_some() {
+                legacy.insert(format!("{key}Original"), json!(s));
+                o.insert(key.into(), json!(strip_fraction(&s)));
+                notes.push(format!("{at}: fractional seconds removed from `{key}`"));
+            }
+        }
     }
+    if let Some(Value::Object(ov)) = o.get_mut("recurrenceOverrides") {
+        let old = std::mem::take(ov);
+        for (k, val) in old {
+            let k2 = strip_fraction(k.strip_suffix('Z').unwrap_or(&k));
+            // Two keys can name one second now; the second override must not disappear.
+            if ov.contains_key(&k2) {
+                notes.push(format!(
+                    "{at}: override `{k}` falls on `{k2}` as well, moved to {LEGACY_KEY}"
+                ));
+                legacy.insert(format!("recurrenceOverrides/{k}"), val);
+            } else {
+                ov.insert(k2, val);
+            }
+        }
+    }
+}
+
+fn strip_fraction(s: &str) -> String {
+    whole_seconds(s).unwrap_or_else(|| s.to_string())
 }
 
 fn move_sub(

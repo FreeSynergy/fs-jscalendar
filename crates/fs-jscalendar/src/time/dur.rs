@@ -5,7 +5,7 @@
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 
 use super::zone::Zone;
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, quoted};
 
 /// Longest duration accepted: about 10 000 years of days plus as much in seconds. Anything longer is
 /// a mistake or an attack. With a start of at most year 9999 (`parse_local`) the sum stays well inside
@@ -25,7 +25,7 @@ pub struct Dur {
 impl Dur {
     /// Parse an ISO 8601 duration like `P1DT2H30M`.
     pub fn parse(s: &str) -> Result<Dur> {
-        let bad = || Error::Time(format!("not a duration: {s:?}"));
+        let bad = || Error::Time(format!("not a duration: {}", quoted(s)));
         let rest = s.strip_prefix('P').ok_or_else(bad)?;
         let (date, time) = match rest.split_once('T') {
             Some((d, t)) => (d, Some(t)),

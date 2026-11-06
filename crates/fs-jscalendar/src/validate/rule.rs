@@ -3,6 +3,7 @@
 //! Pattern: Specification — frequency, interval, count / until and day names.
 
 use super::ctx::{Ctx, DAYS, FREQ};
+use crate::error::quoted;
 use crate::model::RecurrenceRule;
 use crate::time::{parse_local, parse_utc};
 
@@ -10,7 +11,7 @@ pub(super) fn rule(c: &mut Ctx, r: &RecurrenceRule) {
     if !FREQ.contains(&r.frequency.as_str()) {
         c.bad(
             "/recurrenceRule/frequency",
-            format!("unknown frequency {:?}", r.frequency),
+            format!("unknown frequency {}", quoted(&r.frequency)),
         );
     }
     if r.interval == Some(0) {
@@ -27,12 +28,18 @@ pub(super) fn rule(c: &mut Ctx, r: &RecurrenceRule) {
     }
     if let Some(u) = &r.until {
         if parse_local(u).is_err() && parse_utc(u).is_err() {
-            c.bad("/recurrenceRule/until", format!("not a date-time: {u:?}"));
+            c.bad(
+                "/recurrenceRule/until",
+                format!("not a date-time: {}", quoted(u)),
+            );
         }
     }
     for d in &r.by_day {
         if !DAYS.contains(&d.day.as_str()) {
-            c.bad("/recurrenceRule/byDay", format!("unknown day {:?}", d.day));
+            c.bad(
+                "/recurrenceRule/byDay",
+                format!("unknown day {}", quoted(&d.day)),
+            );
         }
     }
     if r.rscale
