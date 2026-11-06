@@ -88,7 +88,7 @@ fn participant_keys_and_uids() {
 #[test]
 fn a_folded_line_with_a_multibyte_character_at_the_cut_does_not_panic() {
     let ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nX-WR-CALNAME:Budget\r\n 12345€ Plan\r\nBEGIN:VTODO\r\nUID:a\r\nDTSTAMP:20261101T000000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
-    let parts = split_ics(ics, Component::Todo);
+    let parts = split_ics(ics, Component::Task);
     assert_eq!(parts.len(), 1);
     assert_eq!(parts[0].uid, "a");
 }
