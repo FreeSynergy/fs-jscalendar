@@ -7,8 +7,9 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use super::zone::Zone;
 use crate::error::{Error, Result};
 
-/// Longest duration accepted, about 10 000 years. Anything longer is a mistake or an attack, and date
-/// arithmetic on it would leave the range of the time library.
+/// Longest duration accepted: about 10 000 years of days plus as much in seconds. Anything longer is
+/// a mistake or an attack. With a start of at most year 9999 (`parse_local`) the sum stays well inside
+/// the range of the time library, so `end_utc` cannot overflow.
 const MAX_DAYS: i64 = 3_650_000;
 
 /// A JSCalendar duration split into nominal days (weeks included) and exact seconds.

@@ -43,7 +43,11 @@ pub struct IcsPart {
 
 fn block_name(line: &str) -> Option<String> {
     let t = line.trim();
-    (t.len() > 6 && t[..6].eq_ignore_ascii_case("BEGIN:")).then(|| t[6..].to_ascii_uppercase())
+    let name = t
+        .get(..6)
+        .filter(|b| b.eq_ignore_ascii_case("BEGIN:"))
+        .map(|_| &t[6..])?;
+    (!name.is_empty()).then(|| name.to_ascii_uppercase())
 }
 
 fn uid_of(block: &[&str]) -> Option<String> {

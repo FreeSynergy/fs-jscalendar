@@ -17,9 +17,21 @@ pub fn fmt_utc(t: DateTime<Utc>) -> String {
     t.format(UTC_FORMAT).to_string()
 }
 
+/// Exactly `YYYY-MM-DDTHH:MM:SS`. The time library alone also takes `+262142-1-1T00:00:0`, whose year
+/// would leave the range of every later calculation.
+fn is_plain(s: &str) -> bool {
+    s.len() == 19
+        && s.bytes().enumerate().all(|(i, b)| match i {
+            4 | 7 => b == b'-',
+            10 => b == b'T',
+            13 | 16 => b == b':',
+            _ => b.is_ascii_digit(),
+        })
+}
+
 /// JSCalendar `LocalDateTime` (`2026-11-24T10:00:00`, no zone, no fraction in 2.0).
 pub fn parse_local(s: &str) -> Result<NaiveDateTime> {
-    if s.len() != 19 {
+    if !is_plain(s) {
         return Err(Error::Time(format!("not a LocalDateTime: {s:?}")));
     }
     NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
@@ -34,7 +46,7 @@ pub fn fmt_local(t: NaiveDateTime) -> String {
 /// `UTCDateTime`: `2026-11-05T09:00:00Z`.
 pub fn parse_utc(s: &str) -> Result<DateTime<Utc>> {
     s.strip_suffix('Z')
-        .filter(|x| x.len() == 19)
+        .filter(|x| is_plain(x))
         .and_then(|x| NaiveDateTime::parse_from_str(x, "%Y-%m-%dT%H:%M:%S").ok())
         .map(|n| n.and_utc())
         .ok_or_else(|| Error::Time(format!("not a UTCDateTime: {s:?}")))
