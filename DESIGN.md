@@ -42,4 +42,4 @@ Version 0.1.3. Taken from `fs-tasks-core` and `fs-calendar-core`, which held ide
 
 - **Errors:** owners turn `fs_jscalendar::Error` into their own with one `From` and keep the same variants.
 - **`calcard` is pinned to `=0.3.14`:** the last MIT/Apache version before later releases moved to AGPL.
-- **`uid`s without `fs-store`:** this crate stores nothing, so it does not depend on the store. `new_uid` makes the same `urn:uuid:` + UUIDv7 form.
+- **`uid`s without `fs-objects`:** this crate stores nothing, so it does not depend on the store. `new_uid` makes the same `urn:uuid:` + UUIDv7 form.
