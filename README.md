@@ -8,7 +8,7 @@ Both owners keep what is theirs: Calendar owns the event, Tasks owns the task. O
 
 ## What it can do today
 
-Latest tag: `v0.1.3`.
+Latest tag: `v0.0.1`.
 
 - Time zones, with the newest tz database found (system or bundled), durations, local and UTC date-times.
 - Shared types for participants and repeat rules, with unknown properties kept.
