@@ -74,7 +74,7 @@ fn durations_round_up_and_what_is_no_fraction_stays() {
         garbage.value["updated"], "not.a.time",
         "left for the validator to name"
     );
-    assert!(!all_issues(&garbage.value).is_empty());
+    assert_ne!(all_issues(&garbage.value), [] as [std::string::String; 0]);
 }
 
 const TODO_A: &str = "BEGIN:VTODO\r\nUID:a\r\nDTSTAMP:20261101T000000Z\r\nDESCRIPTION:one\r\n END:VTODO\r\n still the description\r\nSUMMARY:kept\r\nEND:VTODO\r\n";
